@@ -1,4 +1,8 @@
-var ws = new WebSocket('ws://' + location.host + '/call');
+//var ws = new WebSocket('ws://' + location.host + '/call');
+
+// Let's do this
+var socket = io();
+
 var video;
 var webRtcPeer;
 var state = null;
@@ -9,27 +13,48 @@ window.onload = function() {
 }
 
 window.onbeforeunload = function() {
-	ws.close();
+	socket.emit('close', 'close it');
 }
 
-ws.onmessage = function(message) {
-	var parsedMessage = JSON.parse(message.data);
+// messages handlers
+socket.on('message', message => {
 	console.info('Received message: ' + message.data);
 
-	switch (parsedMessage.id) {
-	case 'response':
-		response(parsedMessage);
-		break;
-	case 'stopCommunication':
-        dispose();
-		break;
-	case 'iceCandidate':
-		webRtcPeer.addIceCandidate(parsedMessage.candidate)
-		break;
-	default:
-		console.error('Unrecognized message', parsedMessage);
-	}
-}
+	switch (message.id) {
+		case 'response':
+			console.log('we got a response');
+			response(message);
+			break;
+		case 'stopCommunication':
+					dispose();
+			break;
+		case 'iceCandidate':
+			console.log('we got a iceCandidate');
+			webRtcPeer.addIceCandidate(message.candidate)
+			break;
+		default:
+			console.error('Unrecognized message', message);
+		}
+});
+
+// ws.onmessage = function(message) {
+// 	var parsedMessage = JSON.parse(message.data);
+// 	console.info('Received message: ' + message.data);
+
+// 	switch (parsedMessage.id) {
+// 	case 'response':
+// 		response(parsedMessage);
+// 		break;
+// 	case 'stopCommunication':
+//         dispose();
+// 		break;
+// 	case 'iceCandidate':
+// 		webRtcPeer.addIceCandidate(parsedMessage.candidate)
+// 		break;
+// 	default:
+// 		console.error('Unrecognized message', parsedMessage);
+// 	}
+// }
 
 function response(message) {
 	if (message.response != 'accepted') {
@@ -47,17 +72,13 @@ function start() {
 	if (!webRtcPeer) {
 		showSpinner(video);
 
-		//        webRtcPeer = kurentoUtils.WebRtcPeer.startSendRecv(undefined, video, function(offerSdp) {
-		//			var message = {
-		//				id : 'client',
-		//				sdpOffer : offerSdp
-		//			};
-		//			sendMessage(message);
-		//		});
 		var options = {
-		localVideo: undefined,
+			localVideo: undefined,
 			remoteVideo: video,
-			onicecandidate : onIceCandidate
+			onicecandidate : onIceCandidate,
+			mediaConstraints : {
+				video : { width : 960, height : 720 }
+			}
 		}
 
 		webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, function(error) {
@@ -69,7 +90,6 @@ function start() {
 			id : 'client',
 			sdpOffer : onOffer
 		};
-			//		sendMessage(message);
 	}
 }
 
@@ -78,14 +98,12 @@ function setState(nextState) {
 }
 
 function onIceCandidate(candidate) {
-	   console.log('Local candidate' + JSON.stringify(candidate));
-	 //  if (state == I_CAN_START){
+	   console.log('Local candidate' + candidate);
 	   var message = {
 	      id : 'onIceCandidate',
 	      candidate : candidate
 	   };
 	   sendMessage(message);
-//	}
 }
 
 function onOffer(error, offerSdp) {
@@ -120,9 +138,9 @@ function dispose() {
 }
 
 function sendMessage(message) {
-	var jsonMessage = JSON.stringify(message);
-	console.log('Senging message: ' + jsonMessage);
-	ws.send(jsonMessage);
+	console.log('Senging message: ' + message);
+	//ws.send(jsonMessage);
+	socket.emit('message', message);
 }
 
 function showSpinner() {

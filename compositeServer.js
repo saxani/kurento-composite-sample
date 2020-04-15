@@ -1,17 +1,19 @@
 var kurento = require('kurento-client');
 var express = require('express');
 var app = express();
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
 var path = require('path');
-var wsm = require('ws');
+require('dotenv').config();
 
-app.set('port', process.env.PORT || 8080);
+//var wsm = require('ws');
 
 /*
  * Definition of constants
  */
 
 // Modify here the kurento media server address
-const ws_uri = "ws://54.67.124.108:8888/kurento";
+const ws_uri = process.env.KURENTO_WS;
 //const ws_uri = "ws://192.168.15.45:8888/kurento";
 
 /*
@@ -34,83 +36,155 @@ function nextUniqueId() {
  * Server startup
  */
 
-var port = app.get('port');
-var server = app.listen(port, function()
-{
-    console.log('Mixing stream server started');
+
+var port = process.env.PROXY_PORT || 3001;
+
+// listen
+http.listen(port, function () {
+    console.log('Example app listening on port: ' + port);
 });
 
-var WebSocketServer = wsm.Server;
-var wss = new WebSocketServer(
-    {
-        server : server,
-        path : '/call'
-    }
-);
 
-/*
- * Management of WebSocket messages
- */
-wss.on('connection', function(ws)
-{
+// var WebSocketServer = wsm.Server;
+// var wss = new WebSocketServer(
+//     {
+//         server : server,
+//         path : '/call'
+//     }
+// );
+
+// signaling
+io.on('connection', function (socket) {
+
     var sessionId = nextUniqueId();
-
     console.log('Connection received with sessionId ' + sessionId);
 
-    ws.on('error', function(error)
+    socket.on('error', function(error)
     {
         console.log('Connection ' + sessionId + ' error');
         stop(sessionId);
     });
 
-    ws.on('close', function()
+    socket.on('close', function()
     {
         console.log('Connection ' + sessionId + ' closed');
         stop(sessionId);
     });
 
-    ws.on('message', function(_message)
-    {
-        var message = JSON.parse(_message);
-	console.log('message id',message.id);
+    socket.on('message', function (message) {
+        console.log('message id', message.id);
         console.log('Connection ' + sessionId + ' received message ', message.id);
 
-        switch (message.id)
-        {
+        switch (message.id) {
             case 'client':
-                addClient(ws,sessionId, message.sdpOffer, function(error, sdpAnswer) {
+                addClient(socket,sessionId, message.sdpOffer, function(error, sdpAnswer) {
                     if (error) {
-                        return ws.send(JSON.stringify({
-                            id : 'response',
-                            response : 'rejected',
-                            message : error
-                        }));
+                        console.log('error on adding client :((((');
+                        return socket.emit('message',
+                            {
+                                id : 'response',
+                                response : 'rejected',
+                                message : error
+                            }
+                        );
                     }
-                    ws.send(JSON.stringify({
-                        id : 'response',
-                        response : 'accepted',
-                        sdpAnswer : sdpAnswer
-                    }));
+
+                    socket.emit('message', 
+                        {
+                            id : 'response',
+                            response : 'accepted',
+                            sdpAnswer : sdpAnswer
+                        }
+                    );
                 });
+
                 break;
 
             case 'stop':
                 stop(sessionId);
                 break;
 
-        case 'onIceCandidate':
-            onIceCandidate(sessionId, message.candidate);
-            break;
+            case 'onIceCandidate':
+                onIceCandidate(sessionId, message.candidate);
+                break;
       
-	      default:
-                ws.send(JSON.stringify({
-                    id : 'error',
-                    message : 'Invalid message ' + message
-                }));
+            default:
+                socket.emit('error', 
+                    {
+                        id : 'error',
+                        message : 'Invalid message ' + message
+                    }
+                );
+
                 break;
         }
+
     });
 });
+
+/*
+ * Management of WebSocket messages
+ */
+// wss.on('connection', function(ws)
+// {
+//     var sessionId = nextUniqueId();
+
+//     console.log('Connection received with sessionId ' + sessionId);
+
+//     ws.on('error', function(error)
+//     {
+//         console.log('Connection ' + sessionId + ' error');
+//         stop(sessionId);
+//     });
+
+//     ws.on('close', function()
+//     {
+//         console.log('Connection ' + sessionId + ' closed');
+//         stop(sessionId);
+//     });
+
+//     ws.on('message', function(_message)
+//     {
+//         var message = JSON.parse(_message);
+// 	console.log('message id',message.id);
+//         console.log('Connection ' + sessionId + ' received message ', message.id);
+
+//         switch (message.id)
+//         {
+//             case 'client':
+//                 addClient(ws,sessionId, message.sdpOffer, function(error, sdpAnswer) {
+//                     if (error) {
+//                         return ws.send(JSON.stringify({
+//                             id : 'response',
+//                             response : 'rejected',
+//                             message : error
+//                         }));
+//                     }
+//                     ws.send(JSON.stringify({
+//                         id : 'response',
+//                         response : 'accepted',
+//                         sdpAnswer : sdpAnswer
+//                     }));
+//                 });
+//                 break;
+
+//             case 'stop':
+//                 stop(sessionId);
+//                 break;
+
+//         case 'onIceCandidate':
+//             onIceCandidate(sessionId, message.candidate);
+//             break;
+      
+// 	      default:
+//                 ws.send(JSON.stringify({
+//                     id : 'error',
+//                     message : 'Invalid message ' + message
+//                 }));
+//                 break;
+//         }
+//     });
+// });
 
 /*
  * Definition of functions
@@ -211,7 +285,7 @@ function createWebRtcEndPoint (callback) {
 }
 
 // Add a webRTC client
-function addClient( ws, id, sdp, callback ) {
+function addClient( socket, id, sdp, callback ) {
 
     createWebRtcEndPoint(function (error, _webRtcEndpoint) {
         if (error) {
@@ -235,10 +309,12 @@ function addClient( ws, id, sdp, callback ) {
         clients[id].webRtcEndpoint = _webRtcEndpoint;
         clients[id]. webRtcEndpoint.on('OnIceCandidate', function(event) {
             var candidate = kurento.register.complexTypes.IceCandidate(event.candidate);
-            ws.send(JSON.stringify({
-                id : 'iceCandidate',
-                candidate : candidate
-            }));
+            socket.emit('message', 
+                {
+                    id : 'iceCandidate',
+                    candidate : candidate
+                }
+            );
         });
 
         console.log("sdp is ",sdp);
