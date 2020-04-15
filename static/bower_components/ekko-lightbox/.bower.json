@@ -41,7 +41,7 @@
     "tag": "v3.3.3",
     "commit": "47bcba9c95e9d0a05dca985228fcfcce26ddeffa"
   },
-  "_source": "https://github.com/ashleydw/lightbox.git",
+  "_source": "git://github.com/ashleydw/lightbox.git",
   "_target": "~3.3.0",
   "_originalSource": "ekko-lightbox"
 }

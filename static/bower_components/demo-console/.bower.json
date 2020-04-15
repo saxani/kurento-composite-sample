@@ -1,7 +1,6 @@
 {
   "name": "demo-console",
   "main": "index.js",
-  "version": "1.5.1",
   "homepage": "https://github.com/piranna/demo-console",
   "authors": [
     "Jesús Leganés Combarro \"piranna\" <piranna@gmail.com>"
@@ -22,13 +21,13 @@
     "test",
     "tests"
   ],
-  "_release": "1.5.1",
+  "_release": "1ff10665e1",
   "_resolution": {
-    "type": "version",
-    "tag": "1.5.1",
-    "commit": "2546ca5ee77922e32b836b7de9d41ab79a89bc9f"
+    "type": "branch",
+    "branch": "master",
+    "commit": "1ff10665e1dc90a1ca7699e1c56254bf62cc687e"
   },
-  "_source": "https://github.com/KurentoForks/demo-console.git",
-  "_target": "1.5.1",
+  "_source": "git://github.com/KurentoForks/demo-console.git",
+  "_target": "master",
   "_originalSource": "demo-console"
 }
